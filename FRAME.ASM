@@ -48,12 +48,31 @@ Exit            macro
 
 
 Start:          LoadVideoES
+                call clean_screen
                 xor bx, bx
 
                 mov di, 81h
                 call Frameprint
                 Exit
 
+;-----------------------------------
+;Cleans the screen
+;-----------------------------------
+;Entry: ES = 0b800h (set on video memory start addr)
+;Exit: None 
+;Destroys: AX, BX CX
+;-----------------------------------
+clean_screen    proc
+                xor bx, bx
+
+                mov cx, 80d*25d 
+@@next:         mov word ptr es:[bx], 0
+                add bx, 2
+                loop @@next
+
+                ret 
+                endp
+;-----------------------------------
 ;-----------------------------------
 ;Print frame on user screen
 ;-----------------------------------
@@ -70,201 +89,196 @@ Start:          LoadVideoES
 ;Destroys: AX, BX, CX, DX, SI, BP, DI = end of msg
 ;-----------------------------------
 Frameprint      proc
+ 
+                xor  bh, bh              ;-| 
+                xor  ah, ah              ; |
+                                         ; |
+                call Skipspaces          ; |
+                call Read_d_num          ; |
+                mov  al, 2d              ; |
+                mul  dl                  ; |set bx
+                                         ; |
+                mov  bx, ax              ; |
+                                         ; |
+                call Skipspaces          ; |
+                call Read_d_num          ; |
+                mov  al, 160d            ; |
+                mul  dl                  ; |
+                add  bx, ax              ;-|
 
-                xor bh, bh          ;-| 
-                xor ah, ah          ; |
-                                    ; |
-                call Skipspaces     ; |
-                call Read_d_num     ; |
-                mov al, 2d          ; |
-                mul dl              ; |set bx
-                                    ; |
-                mov bx, ax          ; |
-                                    ; |
-                call Skipspaces     ; |
-                call Read_d_num     ; |
-                mov al, 160d        ; |
-                mul dl              ; |
-                add bx, ax          ;-|
-
-                call Skipspaces
-                call Read_d_num       ;-|set len
-                mov si, dx            ;-|
+                call Skipspaces          ;-|
+                call Read_d_num          ; |set len
+                mov  si, dx              ;-|
 
 
-                call Skipspaces
-                call Read_d_num       ; |set height
-                mov bp, dx            ;-|
+                call Skipspaces          ;-|
+                call Read_d_num          ; |set height
+                mov  bp, dx              ;-|
                 
 
-                call Skipspaces
-                call Read_h_num         ;set colour
+                call Skipspaces          ;-|
+                call Read_h_num          ;-|set colour
 
-                push bp 
-                mov ax, bx
-                shr bp, 1
-                shl bp, 5
-                add ax, bp
-                shl bp, 2
-                add ax, bp 
-                pop bp  
+                push bp                  ;-|
+                mov  ax, bx              ; |
+                shr  bp, 1               ; |
+                shl  bp, 5               ; |
+                add  ax, bp              ; |
+                shl  bp, 2               ; |shift for text
+                add  ax, bp              ; |
+                pop  bp                  ; |
+                                         ; |
+                push si                  ; | 
+                shr  si, 1               ; | 
+                shl  si, 1               ; |
+                add  ax, si              ; |
+                pop  si                  ;-|
 
-                push si 
-                shr si, 1          ;mov ax, bp shl 8 + bp shl 4                     ;-|shift for text 
-                shl si, 1
-                add ax, si                                 ;-|
-                pop si
-                                                                ;
-                push ax                                         ; |push shift for text
-                xor ah, ah 
+                push ax                  ;-|push shift for text
+                xor  ah, ah 
                 
-                push dx                 ;push colour
+                push dx                  ;push colour
                 
-                ;push bp/2 *160 + bx + si/2
-                
-                call Skipspaces         ;-|
-                call Read_d_num         ; |
-                cmp dx, 0               ; |
-                je @@scanuser           ; |
-                ;push di
-                cmp dx, 1               ; |
-                je @@theme1             ; |
-                cmp dx, 2               ; |
-                je @@theme2             ; |
-                cmp dx, 3               ; | set theme
-                je @@theme3             ; |
-                jmp @@error             ; |
-@@theme1:       pop dx
-                push di
-                mov di, offset theme_1  ; |
-                jmp @@scanchr           ; |
-@@theme2:       pop dx
-                push di
-                mov di, offset theme_2  ; |
-                jmp @@scanchr           ; |
-@@theme3:       pop dx
-                push di
-                mov di, offset theme_3  ; |
-                jmp @@scanchr           ;-|
+                call Skipspaces          ;-|
+                call Read_d_num          ; |
+                cmp  dx, 0               ; |
+                je   @@scanuser          ; |
+                cmp  dx, 1               ; |
+                je   @@theme1            ; |
+                cmp  dx, 2               ; |
+                je   @@theme2            ; |
+                cmp  dx, 3               ; | 
+                je   @@theme3            ; |
+                jmp  @@error             ; |
+@@theme1:       pop  dx                  ; |
+                push di                  ; | set theme
+                mov  di, offset theme_1  ; |
+                jmp  @@scanchr           ; |
+@@theme2:       pop  dx                  ; |
+                push di                  ; |
+                mov  di, offset theme_2  ; |
+                jmp  @@scanchr           ; |
+@@theme3:       pop  dx                  ; |
+                push di                  ; |
+                mov  di, offset theme_3  ; |
+                jmp  @@scanchr           ;-|
 
-@@scanuser:     pop dx 
+@@scanuser:     pop  dx 
                 call Skipspaces 
-                add di, 18d
+                add  di, 18d
                 push di
-                sub di, 18d
+                sub  di, 18d
 
 @@scanchr:      
                 push dx                 ;push colour
                 push dx                 ;push colour
                 push dx                 ;push colour
-                call Skipspaces
-                call Read_h_num     
-                push dx             ;set left high symb
-                
-                call Read_h_num
-                push dx             ;set mid high symb
 
-                call Read_h_num
-                mov al, dl          ;set right high symb
+                call Skipspaces         ;-|
+                call Read_h_num         ; |set left high symb
+                push dx                 ;-|
                 
-                pop cx 
-                mov dl, cl          ;pop mid symb in dl
+                call Read_h_num         ;-|
+                push dx                 ;-|set mid high symb
 
-                pop cx
-                mov ah, cl          ;pop left high symb 
-                pop cx
-                mov dh, cl          ;pop colour 
-                mov cx, si          ;len in cx
+                call Read_h_num         ;-|
+                mov  al, dl             ;-|set right high symb
+                
+                pop  cx                 ;-|
+                mov  dl, cl             ;-|pop mid symb in dl
+
+                pop  cx                 ;-|
+                mov  ah, cl             ;-|pop left high symb
+
+                pop  cx                 ;-|                 
+                mov  dh, cl             ;-|pop colour 
+                mov  cx, si             ;len in cx
                 push cx
                 call Framestring
                 
-                add bx, 160d        ;next str
-                pop cx              ;next str
-                sub bx, cx          ;next str
-                sub bx, cx          ;next str
+                add  bx, 160d           ;-|
+                pop  cx                 ; |
+                sub  bx, cx             ; |next str
+                sub  bx, cx             ;-|
 
-                call Read_h_num
-                push dx             ;set left mid symb
+                call Read_h_num         ;-|
+                push dx                 ;-|set left mid symb
                 
-                call Read_h_num
-                push dx             ;set mid nmid symb
+                call Read_h_num         ;-|
+                push dx                 ;-|set mid nmid symb
 
-                call Read_h_num
-                mov al, dl          ;set right mid symb
+                call Read_h_num         ;-|
+                mov  al, dl             ;-|set right mid symb
 
-                pop cx 
-                mov dl, cl          ;pop mid symb in dl
+                pop  cx                 ;-|
+                mov  dl, cl             ;-|pop mid symb in dl
 
-                pop cx
-                mov ah, cl          ;pop left high symb 
-                pop cx
-                mov dh, cl          ;pop colour 
-                mov cx, si          ;len in cx
-                dec bp 
+                pop  cx                 ;-|
+                mov  ah, cl             ;-|pop left high symb 
+
+                pop  cx                 ;-|
+                mov  dh, cl             ;-|pop colour 
+                mov  cx, si             ;len in cx
+                dec  bp 
                 
 @@mid:                
-                push cx             ; push len
-                ;push bp
+                push cx                 ;push len
                 call Framestring
                 
-                ;pop cx 
-                ;add cx, cx 
-
-
-                add bx, 160d        ;next str
-                pop cx              ;next str (pop len)
-                sub bx, cx          ;next str
-                sub bx, cx          ;next str
+                add  bx, 160d           ;-|
+                pop  cx                 ; |
+                sub  bx, cx             ; |next str
+                sub  bx, cx             ;-|
                 
-                dec bp
+                dec  bp
              
-                cmp bp, 1
-                jne @@mid
+                cmp  bp, 1
+                jne  @@mid
 
-                call Read_h_num
-                push dx             ;set left low symb
+                call Read_h_num         ;-|
+                push dx                 ;-|set left low symb
                 
-                call Read_h_num
-                push dx             ;set mid low symb
+                call Read_h_num         ;-|
+                push dx                 ;-|set mid low symb
 
-                call Read_h_num
-                mov al, dl          ;set right low symb
+                call Read_h_num         ;-|
+                mov  al, dl             ;-|set right low symb
 
-                pop cx 
-                mov dl, cl          ;pop mid symb in dl
+                pop  cx                 ;-|
+                mov  dl, cl             ;-|pop mid symb in dl
 
-                pop cx
-                mov ah, cl          ;pop left high symb 
-                pop cx
-                mov dh, cl          ;pop colour 
-                mov cx, si          ; len in cx
+                pop  cx                 ;-|
+                mov  ah, cl             ;-|pop left high symb
+
+                pop  cx                 ;-|
+                mov  dh, cl             ;-|pop colour 
+                mov  cx, si             ; len in cx
                 call Framestring
 
 
-                pop di
-                pop si             ;pop shift for text
+                pop  di
+                pop  si                 ;pop shift for text
                 push di 
                 call Skipspaces
-                inc di
-                ;lea di, [di]
+                inc  di
                 call strlen_to_quote 
-                shr bx, 1
-                shl bx, 1
-                mov cx, bx
-                mov bx, si 
-                sub bx, cx
-                pop di 
+                shr  bx, 1
+                shl  bx, 1
+                mov  cx, bx
+                mov  bx, si 
+                sub  bx, cx
+                pop  di 
                 call Skipspaces
                 call Print_text                
                 
                 ret
 
-@@error:        pop dx
-                pop dx
-                pop dx
-                mov ah, 09h
-                mov dx, offset error
-                int 21h
+@@error:        pop  dx
+                pop  dx
+                pop  dx
+                mov  ah, 09h
+                mov  dx, offset error
+                int  21h
 
                 ret
                 endp
@@ -283,17 +297,17 @@ strlen_to_quote proc
                 
                 push di 
                 
-                mov al, 27h
-                dec di 
+                mov  al, 27h
+                dec  di 
 
-@@next:         inc di 
-                mov cx, 100h
-                cmp byte ptr[di], al 
-                jne @@next
+@@next:         inc  di 
+                mov  cx, 100h
+                cmp  byte ptr[di], al 
+                jne  @@next
         
-                pop ax
-                mov bx, di
-                sub bx, ax
+                pop  ax
+                mov  bx, di
+                sub  bx, ax
                         
                 ret 
                 endp 
@@ -310,24 +324,24 @@ strlen_to_quote proc
 ;-----------------------------------
 Print_text      proc
 
-                cmp byte ptr [di], "'"
-                jne @@error
-                inc di
+                cmp  byte ptr [di], "'"
+                jne  @@error
+                inc  di
 
-@@next_symb:    mov ah, [di]
-                mov byte ptr es:[bx], ah 
-                inc bx 
-                mov byte ptr es:[bx], dh 
-                inc bx 
+@@next_symb:    mov  ah, [di]
+                mov  byte ptr es:[bx], ah 
+                inc  bx 
+                mov  byte ptr es:[bx], dh 
+                inc  bx 
 
-                inc di 
-                cmp byte ptr [di], "'"
-                je @@end
-                jmp @@next_symb
+                inc  di 
+                cmp  byte ptr [di], "'"
+                je   @@end
+                jmp  @@next_symb
         
-@@error:        mov ah, 09h
-                mov dx, offset print_text_err
-                int 21h
+@@error:        mov  ah, 09h
+                mov  dx, offset print_text_err
+                int  21h
 
 @@end:          ret
                 endp 
@@ -460,9 +474,9 @@ Skipspaces      proc
                 endp  
 ;-----------------------------------
 
-theme_1           db '030403030404040303', "'hello'"
-theme_2           db '030403030404040303', "'hello'"
-theme_3           db '030403030404040303', "'hello'"
+theme_1           db 'DAC4BFB320B3C0C4D9', "'enter your text'"
+theme_2           db '060306032003060306', "'enter your text'"
+theme_3           db 'C9CDBBBA20BAC8CDBC', "'enter your text'"
 error             db 'error$'            
 print_text_err    db "error: msg must start with '$"            
 
