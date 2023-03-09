@@ -8,13 +8,13 @@ INCLUDE         ../macros/exit.asm
 
 Start:          LoadVideoES
                 call clean_screen
-                xor bx, bx
+                ;xor bx, bx
 
-                mov di, 81h
+                mov bx, 81h
                 call Frameprint
                 Exit
 
 INCLUDE         f_clean.asm
-INCLUDE         f_frame.asm
+INCLUDE         new_fr.asm
 
 end		Start
