@@ -1,25 +1,353 @@
-;Committing on GitHub is the act of pushing changes to a project's codebase. 
-;It's a way to update and improve the code, add new features, or fix bugs. 
-I'm sure that every programmer responsible for his code must make commits. 
-That is the first step to become a part of programmer community.
-;The process of committing is simple and efficient. 
-;Developers can use a Git client to create a copy of the code, make changes, and then send the changes back to the original repository.
+;-----------------------------------
+;Print frame on user screen
+;-----------------------------------
+;Entry: ES = 0b800h (set on video memory start addr)
+;       BX = attr: start of array of printing chrs
+;               1, 2 values -  left corner shift 
+;               3           -  len
+;               4           -  height
+;               5           -  colour
+;               6, 7, 8     -  symbols in high str
+;               9, 10, 11   -  symbols in mid str
+;               12, 13, 14  -  symbols in low str
+;Exit: None 
+;Destroys: AX, BX = end of msg, CX, DX, SI, DI, BP
+;-----------------------------------
+Frameprint      proc
+ 
+                xor  dh, dh              ;-|
+                xor  ah, ah              ; |
+                                         ; |
+                call Skipspaces          ; |
+                call Read_d_num          ; |
+                mov  al, 2d              ; |
+                mul  dl                  ; | set di
+                                         ; |
+                mov  di, ax              ; |
+                                         ; |
+                call Skipspaces          ; |
+                call Read_d_num          ; |
+                mov  al, 160d            ; |
+                mul  dl                  ; |
+                add  di, ax              ;-|
 
-;The benefits of committing on GitHub are many. 
-;It provides a platform for developers to showcase their skills and talent while contributing to the development of open-source projects. 
-;It helps developers to learn new technologies, programming languages, and tools to make their work more efficient and effective. 
-;Additionally, committing on GitHub helps developers to collaborate with other developers and learn from their experiences.
+                call Skipspaces          ;-|
+                call Read_d_num          ; | set len
+                mov  si, dx              ;-| 
 
-;Moreover, committing on GitHub opens opportunities for developers to network and build their reputation in the tech community. 
-;GitHub offers a social platform where developers can connect with other developers and collaborate on projects. 
-;It can make them visible to potential employers and increase their chances of getting hired.
 
-;Finally, committing on GitHub for open source projects is a way of giving back to the community.
-;Developers can help to improve the software that they use and benefit from. 
-;It's a way to make a positive impact on society while developing their skills and knowledge.
+                call Skipspaces          ;-|
+                call Read_d_num          ; |set height
+                mov  bp, dx              ;-|
+                
 
-;In conclusion, committing on GitHub is a cool way of collaborating and contributing to open source projects. 
-;It offers a wealth of benefits to developers, including improving their skills, networking opportunities, and making a positive impact on society. 
-No matter how you are tired you should find a couple of minutes to make commit for every important change in your code.
-YOU MUST LEARN TO LOVE COMMITS;(OR YOU ARE DOOMED ((as this file)))
-I encourage responsible and ethical use of GitHub, and urge everyone to use it for the greater good.
+                call Skipspaces          ;-|
+                call Read_h_num          ;-|set colour
+
+                push bp                  ;-|
+                mov  ax, di              ; |
+                shr  bp, 1               ; |
+                shl  bp, 5               ; |
+                add  ax, bp              ; |
+                shl  bp, 2               ; |shift for text in ax
+                add  ax, bp              ; |
+                pop  bp                  ; |
+                                         ; |
+                push si                  ; | 
+                shr  si, 1               ; | 
+                shl  si, 1               ; |
+                add  ax, si              ; |
+                pop  si                  ;-|
+
+                push ax                  ;-|push shift for text
+                mov ah, dl               ;mov colour
+                
+                call Skipspaces          ;-|
+                call Read_d_num          ; |
+                cmp  dl, 0               ; |
+                je   @@scanuser          ; |
+                cmp  dl, 1               ; |
+                je   @@theme1            ; |
+                cmp  dl, 2               ; |
+                je   @@theme2            ; |
+                cmp  dl, 3               ; | 
+                je   @@theme3            ; |
+                jmp  @@error             ; |
+@@theme1:       
+                push bx                  ; | set theme
+                mov  bx, offset theme_1  ; |
+                jmp  @@scanchr           ; |
+@@theme2:
+                push bx                  ; |
+                mov  bx, offset theme_2  ; |
+                jmp  @@scanchr           ; |
+@@theme3:
+                push bx                  ; |
+                mov  bx, offset theme_3  ; |
+                jmp  @@scanchr           ;-|
+
+@@scanuser: 
+                call Skipspaces 
+                add  bx, 18d
+                push bx
+                sub  bx, 18d
+
+@@scanchr:      
+                call Skipspaces         ;-|
+                call Read_h_num         ; |set left high symb
+                mov al, dl 
+                call Read_h_num         ;-|
+                mov dh, dl 
+                call Read_h_num         ;-|
+
+                mov  cx, si             ;len in cx
+                call Framestring
+
+                add  di, 160d           ;-|
+                sub  di, si             ; |next str
+                sub  di, si             ;-|
+
+                call Read_h_num         ;-|
+                mov al, dl 
+                call Read_h_num         ;-|
+                mov dh, dl 
+                call Read_h_num        
+
+                dec  bp 
+                
+@@mid:                
+                mov  cx, si             ;len in cx
+                call Framestring
+                
+                add  di, 160d           ;-|
+                sub  di, si             ; |next str
+                sub  di, si             ;-|
+                
+                dec  bp
+             
+                cmp  bp, 1
+                jne  @@mid
+
+
+                call Read_h_num         ;-|
+                mov al, dl 
+                call Read_h_num         ;-|
+                mov dh, dl 
+                call Read_h_num    
+
+                mov  cx, si             ; len in cx
+                call Framestring
+
+
+                pop  bx 
+                pop  si                 ;pop shift for text
+                call Skipspaces
+                inc  bx 
+                push ax 
+                call strlen_to_quote 
+                shr  ax, 1
+                shl  ax, 1
+                mov  cx, ax 
+                mov  ax, si 
+                sub  ax, cx
+                mov di, ax
+                dec bx
+                pop ax
+                call Skipspaces
+                call Print_text                
+                
+                ret
+
+@@error:        pop  dx
+                pop  dx
+                mov  ah, 09h
+                mov  dx, offset error
+                int  21h
+
+                ret
+                endp
+;-----------------------------------
+
+;-----------------------------------
+;Find len of string up to quote 
+;-----------------------------------
+;Entry: BX = attr: start of str
+;Exit:  AX := len of str
+;Destroys:
+;-----------------------------------
+strlen_to_quote proc
+
+
+                cld
+                
+                push bx 
+                
+                mov  al, "'"
+                dec  bx 
+
+@@next:         inc  bx 
+                ;mov  cx, 100h
+                cmp  byte ptr[bx], al 
+                jne  @@next
+        
+                mov ax, bx 
+                pop  bx 
+                sub  ax, bx
+
+
+                ret 
+                endp 
+;-----------------------------------
+;-----------------------------------
+;print text of frame 
+;-----------------------------------
+;Entry: ES = 0b800h (set on video memory start addr)
+;       BX attr: start of text (MUST START AND END WITH ' symbol)
+;       DI = attr: start addr of printing
+;       AH = attr: colour
+;Exit:  None 
+;Destroys: AL, DI += 2*(len_of_str + 2), BX = end of msg (symbol '), (DX and AH if error)
+;-----------------------------------
+Print_text      proc
+
+                cmp  byte ptr [bx], "'"
+                jne  @@error
+                inc  bx
+
+@@next_symb:    mov  al, [bx]
+                mov  word ptr es:[di], ax  
+                add  di, 2  
+
+                inc  bx 
+                cmp  byte ptr [bx], "'"
+                jne  @@next_symb
+                ret 
+        
+@@error:        mov  ah, 09h
+                mov  dx, offset print_text_err
+                int  21h
+
+                ret
+                endp 
+;-----------------------------------
+;-----------------------------------
+;print string of frame 
+;-----------------------------------
+;Entry: ES = 0b800h (set on video memory start addr)
+;       DI = attr: start addr of printing
+;       CX = attr: len of str
+;       AH = attr: colour
+;       AL = attr: left symbol
+;       DH = attr: mid symbol
+;       DL = attr: right symbol
+;Exit:  None 
+;Destroys: CX = 0, DI += 2 * CX_start_value 
+;-----------------------------------
+Framestring     proc
+
+
+                stosw                                           ;-| write in mem left symbol
+                mov al, dh                                      ;-| mov in ax mid symbol
+                sub cx, 2                                       ;-| cx = num of mid symbols to write
+                rep stosw                                       ;-| writing mid symbols
+                mov al, dl                                      ;-| mov right symbol
+                stosw                                           ;-| write right smbl
+
+
+                ret
+                endp 
+;-----------------------------------
+;-----------------------------------
+;Read num up to 255d from string
+;!!!after num must be a space symbol ' '!!!
+;-----------------------------------
+;Entry; BX = attr: start of string with number
+;Exit:  DL = num
+;       BX = addr of next symbol after num 
+;Destroys: AL, CX
+;-----------------------------------
+Read_d_num      proc  
+
+                xor dl, dl    
+                mov cx, 3
+                jmp @@start
+
+@@r_next:       mov al, dl
+                shl al, 3                                      ;-|
+                shl dl, 1                                      ; | dl *= 10
+                add dl, al                                     ;-|
+
+@@start:        add dl, [bx]                                    ;-|
+                sub dl, '0'                                     ; | dl += (int)[di++]
+                inc bx                                          ;-|
+
+                cmp byte ptr [bx], ' '                          ;-|ret if end of num
+                je @@end 
+                loop @@r_next 
+
+
+@@end:          ret
+                endp  
+;-----------------------------------
+;-----------------------------------
+;Read hex num up to 255d from string
+;-----------------------------------
+;Entry; BX = attr: start of string with number
+;Exit:  DL = num
+;       BX = addr of next symbol after num 
+;Destroys: CX
+;-----------------------------------
+Read_h_num      proc  
+
+
+                xor dl, dl
+                mov cx, 2
+                jmp @@start
+
+@@r_next:       shl dl, 4
+
+@@start:        add dl, byte ptr [bx]
+                cmp byte ptr [bx], '9'
+                jna @@digit
+
+                sub dl, 'A'
+                add dl, 0Ah  
+                jmp @@is_end
+                
+@@digit:        sub dl, '0'
+
+@@is_end:       inc bx
+                cmp byte ptr [bx], ' '
+                je @@end
+                loop @@r_next
+
+
+@@end:          ret
+                endp  
+;-----------------------------------
+;-----------------------------------
+;skip space symbols in str
+;-----------------------------------
+;Entry; BX = attr: addr of string
+;Exit:  BX = first not space symbol
+;Destroys: None
+;-----------------------------------
+Skipspaces      proc  
+
+
+                dec bx
+
+@@next:         inc bx
+                cmp byte ptr [bx], ' '
+                je @@next
+
+
+                ret
+                endp  
+;-----------------------------------
+
+theme_1           db 'DAC4BFB320B3C0C4D9', "'enter your text'"
+theme_2           db '060306032003060306', "'enter your text'"
+theme_3           db 'C9CDBBBA20BAC8CDBC', "'enter your text'"
+error             db 'error$'            
+print_text_err    db "error: msg must start with '$"     
